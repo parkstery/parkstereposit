@@ -84,7 +84,7 @@ function initMaps() {
         const center = googleMap.getCenter();
         const zoom = googleMap.getZoom();
         kakaoMap.setCenter(new kakao.maps.LatLng(center.lat(), center.lng()));
-        kakaoMap.setLevel(17 - zoom);
+        kakaoMap.setLevel(20 - zoom);
     });
 
     // Kakao → Google 동기화
@@ -92,7 +92,7 @@ function initMaps() {
         const center = kakaoMap.getCenter();
         const level = kakaoMap.getLevel();
         googleMap.setCenter({ lat: center.getLat(), lng: center.getLng() });
-        googleMap.setZoom(17 - level);
+        googleMap.setZoom(20 - level);
     });
 
 }
@@ -109,3 +109,4 @@ checkReady();
 </script>
 </body>
 </html>
+
