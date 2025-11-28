@@ -2,191 +2,140 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Google + Kakao Map Sync + Measurement</title>
+<title>Google + Kakao Map Sync</title>
 <style>
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
   #container { display: flex; width: 100%; height: 100%; }
-  #googleMap, #kakaoMap { flex: 1; height: 100%; position: relative; }
-  #tools { position: absolute; top: 10px; left: 10px; z-index: 10; }
-  #tools button { margin-right: 5px; padding: 6px 10px; }
+  #googleMap, #kakaoMap { flex: 1; height: 100%; }
+
+  /* 측정 결과 박스 */
+  #measureResult {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      background: rgba(0,0,0,0.6);
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      z-index: 999;
+      white-space: nowrap;
+  }
 </style>
 </head>
 <body>
 
+<div id="measureResult"></div>
+
 <div id="container">
   <div id="googleMap"></div>
-
-  <!-- Kakao 쪽 툴 버튼 -->
-  <div id="kakaoMap">
-      <div id="tools">
-        <button onclick="startDistance()">거리 측정</button>
-        <button onclick="startArea()">면적 측정</button>
-        <button onclick="clearAll()">지우기</button>
-      </div>
-  </div>
+  <div id="kakaoMap"></div>
 </div>
 
-<!-- Kakao Maps API + Drawing Library -->
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8d2d116d6a534a98e73133808f5843a6&libraries=drawing"></script>
-
-<!-- Google Maps -->
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBYXu5yKdW71VuKmI-N2M2xbvMaYTK2HCg"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_KEY&libraries=drawing"></script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_KEY"></script>
 
 <script>
-let googleMap, kakaoMap;
-let drawingManager;
-let measureLabel = null; // 측정 값 표시용 CustomOverlay
-
+let googleMap, kakaoMap, drawingManager;
 
 function initMaps() {
 
-    /* ------------------------- 구글 지도 ------------------------- */
+    // 1) Google map
     googleMap = new google.maps.Map(document.getElementById("googleMap"), {
         center: { lat: 37.5665, lng: 126.9780 },
         zoom: 14
     });
 
-    /* ------------------------- 카카오 지도 ------------------------ */
-    kakaoMap = new kakao.maps.Map(document.getElementById("kakaoMap"), {
+    // 2) Kakao map
+    kakaoMap = new kakao.maps.Map(document.getElementById('kakaoMap'), {
         center: new kakao.maps.LatLng(37.5665, 126.9780),
         level: 5
     });
 
-    /* ------------------ Drawing Manager ------------------ */
-    drawingManager = new kakao.maps.drawing.DrawingManager({
+    // 3) DrawingManager 옵션
+    const options = {
         map: kakaoMap,
         drawingMode: [
             kakao.maps.drawing.OverlayType.POLYLINE,
             kakao.maps.drawing.OverlayType.POLYGON
         ],
+        guideTooltip: ['draw', 'drag', 'edit'],
         polylineOptions: {
-            draggable: false,
+            draggable: true,
             removable: true,
-            editable: true,
-            strokeWeight: 4,
-            strokeColor: '#ff0000'
+            strokeColor: '#ff0000',
+            strokeWeight: 3
         },
         polygonOptions: {
-            draggable: false,
+            draggable: true,
             removable: true,
-            editable: true,
-            strokeWeight: 2,
             strokeColor: '#00aaff',
             fillColor: '#00aaff',
-            fillOpacity: 0.2
+            fillOpacity: 0.3,
+            strokeWeight: 2
         }
-    });
+    };
 
-    /* ------------------ 측정 완료 이벤트 ------------------ */
+    drawingManager = new kakao.maps.drawing.DrawingManager(options);
+
+    // 4) 측정 결과 HTML 요소
+    const resultBox = document.getElementById('measureResult');
+
+    // 5) 도형 그리기가 끝났을 때 거리/면적 계산
     kakao.maps.event.addListener(drawingManager, 'drawend', function (data) {
-
-        if (measureLabel) measureLabel.setMap(null);
-
-        // 중심 표시용 좌표
-        const bounds = new kakao.maps.LatLngBounds();
+        let resultText = "";
 
         if (data.overlayType === kakao.maps.drawing.OverlayType.POLYLINE) {
-            const path = data.overlay.getPath();  
-            path.forEach(p => bounds.extend(p));
-
-            const distance = Math.round(data.overlay.getLength());
-
-            showLabel(bounds.getCenter(), `거리: ${formatDistance(distance)}`);
-
-        } else if (data.overlayType === kakao.maps.drawing.OverlayType.POLYGON) {
-            const path = data.overlay.getPath();
-            path.forEach(p => bounds.extend(p));
-
-            const area = Math.round(data.overlay.getArea());
-
-            showLabel(bounds.getCenter(), `면적: ${formatArea(area)}`);
+            // 거리 계산
+            const length = Math.round(data.distance); // 미터
+            if (length < 1000) {
+                resultText = `거리: ${length.toLocaleString()} m`;
+            } else {
+                resultText = `거리: ${(length / 1000).toFixed(2)} km`;
+            }
         }
+
+        if (data.overlayType === kakao.maps.drawing.OverlayType.POLYGON) {
+            // 면적 계산
+            const area = Math.round(data.area); // ㎡
+            if (area < 1_000_000) {
+                resultText = `면적: ${area.toLocaleString()} ㎡`;
+            } else {
+                resultText = `면적: ${(area / 1_000_000).toFixed(3)} ㎢`;
+            }
+        }
+
+        resultBox.innerHTML = resultText;
     });
 
-    /* --------------------- 구글 → 카카오 동기화 --------------------- */
+    // 6) Google → Kakao 동기화
     googleMap.addListener("idle", function () {
         const center = googleMap.getCenter();
+        const zoom = googleMap.getZoom();
         kakaoMap.setCenter(new kakao.maps.LatLng(center.lat(), center.lng()));
-        kakaoMap.setLevel(17 - googleMap.getZoom());
+        kakaoMap.setLevel(17 - zoom);
     });
 
-    /* --------------------- 카카오 → 구글 동기화 --------------------- */
+    // 7) Kakao → Google 동기화
     kakao.maps.event.addListener(kakaoMap, 'idle', function () {
         const center = kakaoMap.getCenter();
+        const level = kakaoMap.getLevel();
         googleMap.setCenter({ lat: center.getLat(), lng: center.getLng() });
-        googleMap.setZoom(17 - kakaoMap.getLevel());
+        googleMap.setZoom(17 - level);
     });
 }
 
-/* ---------------------- 거리 측정 ---------------------- */
-function startDistance() {
-    clearAll();
-    drawingManager.cancel();
-    drawingManager.select(kakao.maps.drawing.OverlayType.POLYLINE);
-}
-
-/* ---------------------- 면적 측정 ---------------------- */
-function startArea() {
-    clearAll();
-    drawingManager.cancel();
-    drawingManager.select(kakao.maps.drawing.OverlayType.POLYGON);
-}
-
-/* ---------------------- 표시 지우기 ---------------------- */
-function clearAll() {
-    drawingManager.cancel();
-
-    const objs = drawingManager.getOverlays();
-    for (let type in objs) {
-        objs[type].forEach(o => o.setMap(null));
-    }
-
-    if (measureLabel) {
-        measureLabel.setMap(null);
-        measureLabel = null;
-    }
-}
-
-/* ---------------- 거리/면적 표시 ---------------- */
-function showLabel(position, text) {
-    measureLabel = new kakao.maps.CustomOverlay({
-        position: position,
-        content: `<div style="
-            background:white;
-            padding:6px 12px;
-            border-radius:6px;
-            border:1px solid #444;">
-            ${text}
-        </div>`,
-        yAnchor: 1
-    });
-    measureLabel.setMap(kakaoMap);
-}
-
-/* ---------------- 거리 문자열 변환 ---------------- */
-function formatDistance(m) {
-    if (m < 1000) return m + " m";
-    return (m / 1000).toFixed(2) + " km";
-}
-
-/* ---------------- 면적 문자열 변환 ---------------- */
-function formatArea(a) {
-    const pyeong = a / 3.3058;
-    return `${a} ㎡ (≈ ${pyeong.toFixed(1)} 평)`;
-}
-
-/* ------------------ 로딩 체크 ------------------ */
+// API 준비 확인
 function checkReady() {
-    if (typeof kakao !== 'undefined' &&
-        typeof kakao.maps !== 'undefined' &&
-        typeof google !== 'undefined') {
+    if (typeof kakao === 'object' && typeof kakao.maps === 'object' &&
+        typeof google === 'object' && typeof google.maps === 'object') {
         initMaps();
     } else {
         setTimeout(checkReady, 200);
     }
 }
-
 checkReady();
 </script>
 </body>
 </html>
+
