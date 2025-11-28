@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>Google + Kakao Map Sync</title>
+<title>Google + Kakao Map Sync + Measure</title>
 <style>
   html, body {
     margin: 0;
@@ -21,7 +21,7 @@
   }
 
   /* 버튼 스타일 */
-  #kakaoControls {
+  #kakaoControls, #measureControls {
     position: absolute;
     top: 10px;
     left: 55%;
@@ -30,6 +30,11 @@
     display: flex;
     gap: 8px;
   }
+
+  #measureControls {
+    top: 55px;
+  }
+
   .btn {
     padding: 6px 12px;
     background: #fff;
@@ -38,6 +43,14 @@
     border-radius: 4px;
     font-size: 14px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .label {
+    background: white;
+    padding: 4px 6px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 12px;
   }
 </style>
 </head>
@@ -49,38 +62,44 @@
   <div id="kakaoMap"></div>
 </div>
 
-<!-- 카카오맵 지도/스카이뷰 버튼 -->
+<!-- 지도/스카이뷰 버튼 -->
 <div id="kakaoControls">
   <div class="btn" onclick="setKakaoMapType('roadmap')">지도</div>
   <div class="btn" onclick="setKakaoMapType('skyview')">스카이뷰</div>
 </div>
 
-<!-- Kakao Maps API -->
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8d2d116d6a534a98e73133808f5843a6"></script>
+<!-- 거리·면적 측정 버튼 -->
+<div id="measureControls">
+  <div class="btn" onclick="startDistance()">거리측정</div>
+  <div class="btn" onclick="startArea()">면적측정</div>
+  <div class="btn" onclick="resetMeasure()">초기화</div>
+</div>
+
+<!-- Kakao Maps API (drawing 라이브러리 추가 필수) -->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8d2d116d6a534a98e73133808f5843a6&libraries=drawing"></script>
 
 <!-- Google Maps API -->
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBYXu5yKdW71VuKmI-N2M2xbvMaYTK2HCg"></script>
 
 <script>
 /* ===================================================
-   1️⃣ 축척 매핑 테이블 (Google Zoom ↔ Kakao Level)
+   1️⃣ 축척 매핑 테이블
    =================================================== */
-const zoomToLevel = {
-    19: 1, 18: 2, 17: 3, 16: 4, 15: 5,
-    14: 6, 13: 7, 12: 8, 11: 9, 10: 10
-};
-
-const levelToZoom = {
-    1: 19, 2: 18, 3: 17, 4: 16, 5: 15,
-    6: 14, 7: 13, 8: 12, 9: 11, 10: 10
-};
+const zoomToLevel = { 19:1,18:2,17:3,16:4,15:5,14:6,13:7,12:8,11:9,10:10 };
+const levelToZoom = { 1:19,2:18,3:17,4:16,5:15,6:14,7:13,8:12,9:11,10:10 };
 
 let googleMap, kakaoMap;
 let isSyncing = false;
 
-/* ======================================
-   2️⃣ 지도 초기화
-   ====================================== */
+/* ===================================================
+   2️⃣ 카카오 측정용 변수
+   =================================================== */
+let drawingManager;
+let measureOverlay = null;
+
+/* ===================================================
+   3️⃣ 지도 초기화
+   =================================================== */
 function initMaps() {
     // Google 지도
     googleMap = new google.maps.Map(document.getElementById("googleMap"), {
@@ -94,8 +113,53 @@ function initMaps() {
         level: zoomToLevel[15]
     });
 
+    // =====================================
+    // Drawing Manager (거리/면적 기능)
+    // =====================================
+    drawingManager = new kakao.maps.drawing.DrawingManager({
+        map: kakaoMap,
+        drawingMode: [
+            kakao.maps.drawing.OverlayType.POLYLINE,
+            kakao.maps.drawing.OverlayType.POLYGON
+        ],
+        guideTooltip: ['draw','drag','edit'],
+        polylineOptions: {
+            draggable: false,
+            removable: false,
+            editable: false,
+            strokeWeight: 3,
+            strokeColor: '#ff0000'
+        },
+        polygonOptions: {
+            draggable: false,
+            removable: false,
+            editable: false,
+            fillColor: 'rgba(255,0,0,0.3)',
+            strokeWeight: 2,
+            strokeColor: '#ff0000'
+        }
+    });
+
+    // ---------------------------------------
+    // Complete event: 거리·면적 계산 및 표시
+    // ---------------------------------------
+    kakao.maps.event.addListener(drawingManager, 'drawend', function(data) {
+        if (measureOverlay) measureOverlay.setMap(null);
+
+        if (data.overlayType === kakao.maps.drawing.OverlayType.POLYLINE) {
+            const distance = Math.round(data.distance);
+            showMeasureLabel(data.points[data.points.length - 1], distance + ' m');
+        }
+
+        if (data.overlayType === kakao.maps.drawing.OverlayType.POLYGON) {
+            const area = Math.round(data.area);
+            const pos = data.points[0]; 
+            showMeasureLabel(pos, area + ' m²');
+        }
+    });
+
     /* ======================================
-       3️⃣ Google → Kakao 동기화
+       Google → Kakao 동기화
        ====================================== */
     googleMap.addListener("idle", function () {
         if (isSyncing) return;
@@ -112,7 +176,7 @@ function initMaps() {
     });
 
     /* ======================================
-       4️⃣ Kakao → Google 동기화
+       Kakao → Google 동기화
        ====================================== */
     kakao.maps.event.addListener(kakaoMap, 'idle', function () {
         if (isSyncing) return;
@@ -129,20 +193,54 @@ function initMaps() {
     });
 }
 
-/* ======================================
-   5️⃣ Kakao 지도 타입 변경 버튼
-   ====================================== */
+/* ===================================================
+   4️⃣ 지도 타입 변경
+   =================================================== */
 function setKakaoMapType(type) {
     if (type === "roadmap") {
         kakaoMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-    } else if (type === "skyview") {
+    } else {
         kakaoMap.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
     }
 }
 
-/* ======================================
-   6️⃣ 두 API 준비 완료될 때까지 기다림
-   ====================================== */
+/* ===================================================
+   5️⃣ 측정 기능
+   =================================================== */
+function startDistance() {
+    drawingManager.cancel();
+    drawingManager.select(kakao.maps.drawing.OverlayType.POLYLINE);
+}
+
+function startArea() {
+    drawingManager.cancel();
+    drawingManager.select(kakao.maps.drawing.OverlayType.POLYGON);
+}
+
+function resetMeasure() {
+    drawingManager.cancel();
+    drawingManager.removeAll();
+    if (measureOverlay) measureOverlay.setMap(null);
+}
+
+/* ===================================================
+   6️⃣ 라벨 표시
+   =================================================== */
+function showMeasureLabel(position, text) {
+    if (measureOverlay) measureOverlay.setMap(null);
+
+    const content = '<div class="label">' + text + '</div>';
+    measureOverlay = new kakao.maps.CustomOverlay({
+        position: position,
+        content: content,
+        yAnchor: 1.5
+    });
+    measureOverlay.setMap(kakaoMap);
+}
+
+/* ===================================================
+   7️⃣ 두 API 준비 확인
+   =================================================== */
 function waitUntilReady() {
     if (typeof kakao !== "undefined" &&
         typeof kakao.maps !== "undefined" &&
@@ -158,7 +256,5 @@ waitUntilReady();
 </script>
 </body>
 </html>
-
-
 
 
