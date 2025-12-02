@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>구글 PlaceAutocompleteElement 예시</title>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBYXu5yKdW71VuKmI-N2M2xbvMaYTK2HCg&libraries=places&loading=async"></script>
+  <style>
+    gmp-autocomplete {
+      display: block;
+      width: 300px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <gmp-autocomplete id="autocomplete"></gmp-autocomplete>
+  <div id="place-details"></div>
+
+  <script>
+    window.addEventListener('load', () => {
+      const autocomplete = document.getElementById('autocomplete');
+
+      autocomplete.addEventListener('gmp-select', async e => {
+        const placePrediction = e.detail.placePrediction;
+        const place = placePrediction.toPlace();
+        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+
+        document.getElementById('place-details').textContent =
+          `선택 장소: ${place.displayName}, 주소: ${place.formattedAddress}, 좌표: ${place.location.lat()}, ${place.location.lng()}`;
+      });
+    });
+  </script>
+</body>
+</html>
