@@ -1,33 +1,393 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-  <title>구글 PlaceAutocompleteElement 예시</title>
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBYXu5yKdW71VuKmI-N2M2xbvMaYTK2HCg&libraries=places&loading=async"></script>
-  <style>
-    gmp-autocomplete {
-      display: block;
-      width: 300px;
-      margin-bottom: 10px;
-    }
-  </style>
+    <meta charset="utf-8">
+    <title>Dual Map GIS: Google & Kakao Sync (Fixed)</title>
+    <style>
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; font-family: 'Malgun Gothic', dotum, sans-serif; overflow: hidden; }
+        
+        .container { display: flex; width: 100%; height: 100%; transition: all 0.3s; }
+
+        /* 좌측: 구글맵 */
+        #google-map-wrap { width: 50%; height: 100%; position: relative; border-right: 1px solid #aaa; box-sizing: border-box; transition: width 0.3s; }
+        #google-map { width: 100%; height: 100%; }
+
+        /* 우측: 카카오맵 */
+        .map_wrap { position: relative; width: 50%; height: 100%; transition: width 0.3s; }
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; background: #eee; }
+        
+        /* 미니맵 스타일 */
+        #map.minimap {
+            width: 400px !important; height: 350px !important; 
+            top: auto !important; bottom: 0; left: 0;
+            z-index: 20; 
+            border-top: 1px solid #888; border-right: 1px solid #888;
+            box-shadow: 2px -2px 5px rgba(0,0,0,0.3);
+        }
+
+        #roadview { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 5; background: #333; display: none; }
+        #resizer { position: absolute; top: 0; right: 0; width: 20px; height: 20px; background: #3396ff; cursor: nesw-resize; z-index: 100; display: none; border-bottom-left-radius: 5px; }
+
+        #rv-close-btn { position: absolute; top: 10px; right: 10px; z-index: 30; padding: 10px 15px; background: #333; color: white; border: 1px solid #555; cursor: pointer; border-radius: 3px; font-weight: bold; display: none; }
+        #rv-close-btn:hover { background: #555; }
+
+        .search_box { position: absolute; top: 10px; left: 10px; z-index: 30; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; gap: 5px; }
+        .search_box input { width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; }
+        .search_box button { padding: 5px 10px; background: #3396ff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+
+        .toolbar { position: absolute; top: 60px; left: 10px; z-index: 30; background: white; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; overflow: hidden; }
+        .toolbar button { background: #fff; border: 0; border-right: 1px solid #ddd; padding: 8px 12px; cursor: pointer; font-weight: bold; font-size: 12px; outline: none; }
+        .toolbar button:last-child { border-right: none; }
+        .toolbar button:hover { background: #f5f5f5; }
+        .toolbar button.active { background: #3396ff; color: white; }
+        .toolbar button.delete-btn { color: #e14f4f; }
+
+        .info-overlay { background: white; border: 1px solid #333; border-radius: 4px; padding: 10px; font-size: 12px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); white-space: nowrap; }
+        .measure-label { background: #fff; padding: 3px 6px; border: 1px solid #888; border-radius: 3px; font-size: 11px; color: #333; box-shadow: 1px 1px 3px rgba(0,0,0,0.2); white-space: nowrap; }
+        .MapWalker { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; pointer-events: none; }
+        .MapWalker .angleBack { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 40px solid rgba(51, 150, 255, 0.4); transform-origin: center bottom; margin-left: -20px; margin-top: -40px; z-index: 1; }
+        .MapWalker .figure { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 16px solid #ff3300; transform-origin: center center; margin-left: -8px; margin-top: -8px; z-index: 2; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
+        
+        .error-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #555; display: none; z-index: 999; background: rgba(255,255,255,0.8); padding: 20px; }
+    </style>
 </head>
 <body>
-  <gmp-autocomplete id="autocomplete"></gmp-autocomplete>
-  <div id="place-details"></div>
 
-  <script>
-    window.addEventListener('load', () => {
-      const autocomplete = document.getElementById('autocomplete');
+<div class="container">
+    <div id="google-map-wrap">
+        <div id="google-map"></div>
+    </div>
 
-      autocomplete.addEventListener('gmp-select', async e => {
-        const placePrediction = e.detail.placePrediction;
-        const place = placePrediction.toPlace();
-        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+    <div class="map_wrap" id="kakao-wrap">
+        <div id="roadview"></div>
+        <div id="rv-close-btn" onclick="toggleMode('default')">로드뷰 닫기 X</div>
 
-        document.getElementById('place-details').textContent =
-          `선택 장소: ${place.displayName}, 주소: ${place.formattedAddress}, 좌표: ${place.location.lat()}, ${place.location.lng()}`;
-      });
+        <div id="map">
+            <div id="resizer"></div>
+            
+            <div class="search_box">
+                <input type="text" id="keyword" placeholder="주소, 건물명 검색" onkeypress="if(event.keyCode==13) searchPlaces();">
+                <button onclick="searchPlaces()">검색</button>
+            </div>
+
+            <div class="toolbar">
+                <button onclick="toggleMode('default')" class="active" id="btn-default">이동</button>
+                <button onclick="toggleMode('roadview')" id="btn-roadview">로드뷰</button>
+                <button onclick="toggleMode('distance')" id="btn-distance">거리</button>
+                <button onclick="toggleMode('area')" id="btn-area">면적</button>
+                <button onclick="clearMeasurements()" class="delete-btn">초기화</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="error-message" class="error-msg">
+    <h3>지도를 불러올 수 없습니다.</h3>
+    <p>API 키 설정을 확인해주세요.</p>
+</div>
+
+<!-- 1. 카카오맵 SDK (먼저 로드) -->
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=8d2d116d6a534a98e73133808f5843a6&libraries=services,drawing,clusterer"></script>
+
+<!-- 2. 메인 스크립트 로직 (initGoogleMap 정의 포함) -->
+<script>
+    var mapContainer = document.getElementById('map');
+    var rvContainer = document.getElementById('roadview');
+    var rvCloseBtn = document.getElementById('rv-close-btn');
+    var resizer = document.getElementById('resizer');
+    
+    var googleMapWrap = document.getElementById('google-map-wrap');
+    var kakaoWrap = document.getElementById('kakao-wrap');
+
+    var map = null; 
+    var gMap = null; 
+    var syncLock = false; 
+
+    var ps = new kakao.maps.services.Places();
+    var rv = new kakao.maps.Roadview(rvContainer);
+    var rvClient = new kakao.maps.RoadviewClient();
+    
+    var mapWalker = null;
+    var searchMarker = null;
+    var currentMode = 'default';
+    var drawingObject = null;
+    var drawingPath = [];
+    var allOverlays = []; 
+    var allShapes = [];   
+    var allMarkers = [];  
+
+    var startLat = 37.566826;
+    var startLng = 126.9786567;
+
+    // 카카오맵 초기화
+    if (typeof kakao === 'undefined') {
+        document.getElementById('error-message').style.display = 'block';
+    } else {
+        var mapOption = { center: new kakao.maps.LatLng(startLat, startLng), level: 3 };
+        map = new kakao.maps.Map(mapContainer, mapOption);
+        map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
+        map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+        
+        kakao.maps.event.addListener(map, 'center_changed', syncGoogleFromKakao);
+        kakao.maps.event.addListener(map, 'zoom_changed', syncGoogleFromKakao);
+    }
+
+    // [중요] initGoogleMap 함수를 전역(window)에 정의
+    window.initGoogleMap = function() {
+        var gOptions = { 
+            center: { lat: startLat, lng: startLng }, 
+            zoom: 17, 
+            disableDefaultUI: false, 
+            scaleControl: true 
+        };
+        gMap = new google.maps.Map(document.getElementById('google-map'), gOptions);
+        
+        // 구글맵 이벤트 리스너
+        gMap.addListener('center_changed', syncKakaoFromGoogle);
+        gMap.addListener('zoom_changed', syncKakaoFromGoogle);
+        gMap.addListener('drag', syncKakaoFromGoogle);
+    };
+
+    // 동기화 함수들
+    function syncGoogleFromKakao() {
+        if (!gMap || syncLock) return;
+        syncLock = true;
+        var center = map.getCenter();
+        var kLevel = map.getLevel();
+        var gZoom = 20 - kLevel;
+        gMap.setCenter({ lat: center.getLat(), lng: center.getLng() });
+        if(gMap.getZoom() !== gZoom) gMap.setZoom(gZoom);
+        setTimeout(function(){ syncLock = false; }, 50);
+    }
+
+    function syncKakaoFromGoogle() {
+        if (!map || syncLock) return;
+        syncLock = true;
+        var center = gMap.getCenter();
+        var gZoom = gMap.getZoom();
+        var kLevel = 20 - gZoom;
+        if (kLevel < 1) kLevel = 1; if (kLevel > 14) kLevel = 14;
+        map.setCenter(new kakao.maps.LatLng(center.lat(), center.lng()));
+        if(map.getLevel() !== kLevel) map.setLevel(kLevel);
+        setTimeout(function(){ syncLock = false; }, 50);
+    }
+
+    function createWalkerContent(angle) {
+        return `<div class="MapWalker">
+                    <div class="angleBack" style="transform: rotate(${angle}deg);"></div>
+                    <div class="figure" style="transform: rotate(${angle}deg);"></div>
+                </div>`;
+    }
+
+    function searchPlaces() {
+        var keyword = document.getElementById('keyword').value.trim();
+        if (!keyword) { alert('키워드를 입력해주세요!'); return; }
+        ps.keywordSearch(keyword, placesSearchCB);
+    }
+
+    function placesSearchCB(data, status, pagination) {
+        if (status === kakao.maps.services.Status.OK) {
+            var targetPosition = new kakao.maps.LatLng(data[0].y, data[0].x);
+            if (searchMarker) searchMarker.setMap(null);
+            searchMarker = new kakao.maps.Marker({ position: targetPosition, map: map });
+            map.setCenter(targetPosition);
+            map.setLevel(3);
+            if (currentMode === 'roadview') toggleRoadview(targetPosition);
+        } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+            alert('검색 결과가 없습니다.');
+        } else {
+            alert('오류가 발생했습니다.');
+        }
+    }
+
+    function toggleMode(mode) {
+        if (!map) return;
+        stopDrawing();
+
+        if (mode === 'roadview' && currentMode === 'roadview') {
+            toggleMode('default'); 
+            return;
+        }
+
+        document.querySelectorAll('.toolbar button').forEach(btn => {
+            if(!btn.classList.contains('delete-btn')) btn.classList.remove('active');
+        });
+        var targetBtn = document.getElementById('btn-' + mode);
+        if(targetBtn) targetBtn.classList.add('active');
+
+        if (currentMode === 'roadview' && mode !== 'roadview') {
+            closeRoadviewUI();
+        }
+
+        currentMode = mode;
+
+        if (mode === 'roadview') {
+            googleMapWrap.style.width = '0%';
+            kakaoWrap.style.width = '100%';
+
+            rvContainer.style.display = 'block';
+            rvCloseBtn.style.display = 'block';
+            resizer.style.display = 'block';
+
+            mapContainer.style.width = ''; 
+            mapContainer.style.height = ''; 
+            
+            mapContainer.classList.add('minimap');
+            map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+
+            setTimeout(function() { 
+                map.relayout(); 
+                rv.relayout(); 
+                toggleRoadview(map.getCenter());
+            }, 300);
+
+        } else if (mode === 'distance' || mode === 'area') {
+            map.setCursor('crosshair');
+        } else {
+            map.setCursor('default');
+            if (googleMapWrap.style.width === '0%') {
+                closeRoadviewUI();
+            }
+        }
+    }
+
+    function closeRoadviewUI() {
+        rvContainer.style.display = 'none';
+        rvCloseBtn.style.display = 'none';
+        
+        googleMapWrap.style.width = '50%';
+        kakaoWrap.style.width = '50%';
+        
+        mapContainer.classList.remove('minimap');
+        resizer.style.display = 'none';
+
+        mapContainer.style.width = '100%';
+        mapContainer.style.height = '100%';
+
+        map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+        
+        if(mapWalker) {
+            mapWalker.setMap(null);
+            mapWalker = null;
+        }
+        
+        setTimeout(function() { 
+            map.relayout(); 
+            if(gMap) google.maps.event.trigger(gMap, "resize");
+            syncGoogleFromKakao(); 
+        }, 300);
+    }
+
+    function toggleRoadview(position) {
+        rvClient.getNearestPanoId(position, 50, function(panoId) {
+            if (panoId) {
+                rv.setPanoId(panoId, position);
+                if(!mapWalker) initWalker(position);
+                else moveWalker(position);
+            }
+        });
+    }
+
+    var isResizing = false;
+    resizer.addEventListener('mousedown', function(e) { isResizing = true; e.preventDefault(); e.stopPropagation(); });
+    window.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        if (!mapContainer.classList.contains('minimap')) return;
+        var newWidth = e.clientX;
+        var newHeight = window.innerHeight - e.clientY;
+        if(newWidth < 200) newWidth = 200;
+        if(newHeight < 200) newHeight = 200;
+        mapContainer.style.width = newWidth + 'px';
+        mapContainer.style.height = newHeight + 'px';
+        map.relayout();
+        if(mapWalker) map.setCenter(mapWalker.getPosition());
     });
-  </script>
+    window.addEventListener('mouseup', function() { if (isResizing) { isResizing = false; map.relayout(); } });
+
+    function initWalker(position) {
+        if(mapWalker) mapWalker.setMap(null);
+        mapWalker = new kakao.maps.CustomOverlay({ position: position, content: createWalkerContent(0), map: map });
+    }
+    function moveWalker(position) { if(mapWalker) mapWalker.setPosition(position); }
+    kakao.maps.event.addListener(rv, 'viewpoint_changed', function() {
+        var viewpoint = rv.getViewpoint();
+        if(mapWalker) mapWalker.setContent(createWalkerContent(viewpoint.pan));
+    });
+    kakao.maps.event.addListener(rv, 'position_changed', function() {
+        var rvPos = rv.getPosition();
+        moveWalker(rvPos);
+        map.setCenter(rvPos);
+    });
+    kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
+        var clickPosition = mouseEvent.latLng;
+        if (currentMode === 'roadview') { toggleRoadview(clickPosition); return; }
+        if (currentMode !== 'distance' && currentMode !== 'area') return;
+        drawingPath.push(clickPosition);
+        var marker = new kakao.maps.Marker({ position: clickPosition, map: map });
+        allMarkers.push(marker);
+        if (!drawingObject) {
+            if (currentMode === 'distance') {
+                drawingObject = new kakao.maps.Polyline({ map: map, path: [clickPosition], strokeWeight: 3, strokeColor: '#db4040', strokeOpacity: 1, strokeStyle: 'solid' });
+            } else {
+                drawingObject = new kakao.maps.Polygon({ map: map, path: [clickPosition], strokeWeight: 3, strokeColor: '#39f', strokeOpacity: 0.8, strokeStyle: 'longdash', fillColor: '#39f', fillOpacity: 0.2 });
+            }
+        } else {
+            drawingObject.setPath(drawingPath);
+            var content = '';
+            if (currentMode === 'distance') {
+                var dist = Math.round(drawingObject.getLength());
+                content = `<div class="measure-label">${dist.toLocaleString()}m</div>`;
+            } else if (currentMode === 'area') {
+                if (drawingPath.length >= 3) {
+                    var area = Math.round(drawingObject.getArea());
+                    content = `<div class="measure-label">${area.toLocaleString()}m²</div>`;
+                }
+            }
+            if (content) {
+                var labelOverlay = new kakao.maps.CustomOverlay({ map: map, position: clickPosition, content: content, yAnchor: 2.5 });
+                allOverlays.push(labelOverlay);
+            }
+        }
+    });
+    kakao.maps.event.addListener(map, 'mousemove', function(mouseEvent) {
+        if (!drawingObject) return;
+        var path = drawingPath.slice();
+        path.push(mouseEvent.latLng);
+        drawingObject.setPath(path);
+    });
+    kakao.maps.event.addListener(map, 'rightclick', function(mouseEvent) {
+        if (!drawingObject) return;
+        var position = drawingPath[drawingPath.length - 1];
+        var content = '';
+        if (currentMode === 'distance') {
+            var dist = Math.round(drawingObject.getLength());
+            content = `<div class="info-overlay">총 거리 <span class="number">${dist.toLocaleString()}m</span></div>`;
+        } else {
+            var area = Math.round(drawingObject.getArea());
+            var pyeong = (area * 0.3025).toFixed(1);
+            content = `<div class="info-overlay">총 면적 <span class="number">${area.toLocaleString()}m²</span><br><span class="desc">(${Number(pyeong).toLocaleString()}평)</span></div>`;
+        }
+        var overlay = new kakao.maps.CustomOverlay({ map: map, position: position, content: content, yAnchor: 1 });
+        allOverlays.push(overlay);
+        allShapes.push(drawingObject);
+        drawingObject = null;
+        drawingPath = [];
+    });
+
+    function clearMeasurements() {
+        allOverlays.forEach(o => o.setMap(null));
+        allShapes.forEach(s => s.setMap(null));
+        allMarkers.forEach(m => m.setMap(null));
+        allOverlays = []; allShapes = []; allMarkers = [];
+        stopDrawing();
+        if (searchMarker) { searchMarker.setMap(null); searchMarker = null; }
+        document.getElementById('keyword').value = '';
+    }
+    function stopDrawing() { if (drawingObject) drawingObject.setMap(null); drawingObject = null; drawingPath = []; }
+</script>
+
+<!-- 3. 구글맵 API (제일 마지막에 로드하여 initGoogleMap 정의 후 실행되도록 함) -->
+<!-- YOUR_GOOGLE_API_KEY 부분에 본인의 키를 입력하세요 -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBYXu5yKdW71VuKmI-N2M2xbvMaYTK2HCg&callback=initGoogleMap" async defer></script>
 </body>
 </html>
