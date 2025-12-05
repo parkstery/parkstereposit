@@ -2,393 +2,280 @@
 <html lang="ko">
 <head>
     <meta charset="utf-8">
-    <title>Dual Map GIS: Google & Kakao Sync (Fixed)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Community Board</title>
+    <!-- 구글 폰트 & 아이콘 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        html, body { width: 100%; height: 100%; margin: 0; padding: 0; font-family: 'Malgun Gothic', dotum, sans-serif; overflow: hidden; }
-        
-        .container { display: flex; width: 100%; height: 100%; transition: all 0.3s; }
-
-        /* 좌측: 구글맵 */
-        #google-map-wrap { width: 50%; height: 100%; position: relative; border-right: 1px solid #aaa; box-sizing: border-box; transition: width 0.3s; }
-        #google-map { width: 100%; height: 100%; }
-
-        /* 우측: 카카오맵 */
-        .map_wrap { position: relative; width: 50%; height: 100%; transition: width 0.3s; }
-        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; background: #eee; }
-        
-        /* 미니맵 스타일 */
-        #map.minimap {
-            width: 400px !important; height: 350px !important; 
-            top: auto !important; bottom: 0; left: 0;
-            z-index: 20; 
-            border-top: 1px solid #888; border-right: 1px solid #888;
-            box-shadow: 2px -2px 5px rgba(0,0,0,0.3);
+        /* [스타일] 세련된 모던 UI */
+        :root {
+            --primary: #4F46E5;
+            --bg-color: #F3F4F6;
+            --card-bg: #ffffff;
+            --text-main: #1F2937;
+            --text-sub: #6B7280;
         }
 
-        #roadview { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 5; background: #333; display: none; }
-        #resizer { position: absolute; top: 0; right: 0; width: 20px; height: 20px; background: #3396ff; cursor: nesw-resize; z-index: 100; display: none; border-bottom-left-radius: 5px; }
-
-        #rv-close-btn { position: absolute; top: 10px; right: 10px; z-index: 30; padding: 10px 15px; background: #333; color: white; border: 1px solid #555; cursor: pointer; border-radius: 3px; font-weight: bold; display: none; }
-        #rv-close-btn:hover { background: #555; }
-
-        .search_box { position: absolute; top: 10px; left: 10px; z-index: 30; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; gap: 5px; }
-        .search_box input { width: 150px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; }
-        .search_box button { padding: 5px 10px; background: #3396ff; color: white; border: none; border-radius: 3px; cursor: pointer; }
-
-        .toolbar { position: absolute; top: 60px; left: 10px; z-index: 30; background: white; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; overflow: hidden; }
-        .toolbar button { background: #fff; border: 0; border-right: 1px solid #ddd; padding: 8px 12px; cursor: pointer; font-weight: bold; font-size: 12px; outline: none; }
-        .toolbar button:last-child { border-right: none; }
-        .toolbar button:hover { background: #f5f5f5; }
-        .toolbar button.active { background: #3396ff; color: white; }
-        .toolbar button.delete-btn { color: #e14f4f; }
-
-        .info-overlay { background: white; border: 1px solid #333; border-radius: 4px; padding: 10px; font-size: 12px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); white-space: nowrap; }
-        .measure-label { background: #fff; padding: 3px 6px; border: 1px solid #888; border-radius: 3px; font-size: 11px; color: #333; box-shadow: 1px 1px 3px rgba(0,0,0,0.2); white-space: nowrap; }
-        .MapWalker { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; pointer-events: none; }
-        .MapWalker .angleBack { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 40px solid rgba(51, 150, 255, 0.4); transform-origin: center bottom; margin-left: -20px; margin-top: -40px; z-index: 1; }
-        .MapWalker .figure { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 16px solid #ff3300; transform-origin: center center; margin-left: -8px; margin-top: -8px; z-index: 2; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
+        body { margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--bg-color); color: var(--text-main); }
         
-        .error-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #555; display: none; z-index: 999; background: rgba(255,255,255,0.8); padding: 20px; }
+        /* 헤더 */
+        header { background: var(--card-bg); padding: 1rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .user-info { display: flex; align-items: center; gap: 1rem; font-size: 0.9rem; }
+        .btn { padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #4338ca; }
+        .btn-outline { background: transparent; border: 1px solid #ddd; color: var(--text-main); }
+        .btn-outline:hover { background: #f9fafb; }
+
+        /* 컨테이너 */
+        .container { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+
+        /* 화면 전환용 (로그인 전/후, 글쓰기 등) */
+        .view-section { display: none; animation: fadeIn 0.3s ease; }
+        .view-section.active { display: block; }
+
+        /* 로그인 폼 */
+        .login-box { background: var(--card-bg); padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; max-width: 400px; margin: 4rem auto; }
+        .login-box h2 { margin-bottom: 1.5rem; }
+        
+        /* 게시판 리스트 */
+        .board-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .post-card { background: var(--card-bg); padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: transform 0.2s; cursor: pointer; }
+        .post-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .post-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .post-meta { font-size: 0.85rem; color: var(--text-sub); display: flex; justify-content: space-between; }
+
+        /* 글쓰기 폼 */
+        .write-box { background: var(--card-bg); padding: 2rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 1rem; }
+        .input-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        .input-group input, .input-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 0.375rem; font-family: inherit; box-sizing: border-box; }
+        .input-group textarea { height: 200px; resize: vertical; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
+<header>
+    <a href="#" class="logo" onclick="showBoard()">Parkstery Board</a>
+    <div class="user-info">
+        <span id="user-display" style="display:none;">환영합니다!</span>
+        <button id="btn-login" class="btn btn-primary" onclick="googleLogin()">Google 로그인</button>
+        <button id="btn-logout" class="btn btn-outline" style="display:none;" onclick="logout()">로그아웃</button>
+    </div>
+</header>
+
 <div class="container">
-    <div id="google-map-wrap">
-        <div id="google-map"></div>
+    <!-- 1. 로그인 필요 화면 -->
+    <div id="view-login-required" class="view-section active">
+        <div class="login-box">
+            <i class="fas fa-lock fa-3x" style="color: #ddd; margin-bottom: 1rem;"></i>
+            <h2>로그인이 필요합니다</h2>
+            <p style="color: var(--text-sub); margin-bottom: 2rem;">게시글을 보거나 작성하려면 로그인을 해주세요.</p>
+            <button class="btn btn-primary" style="width: 100%;" onclick="googleLogin()">
+                <i class="fab fa-google"></i> 구글 계정으로 시작하기
+            </button>
+        </div>
     </div>
 
-    <div class="map_wrap" id="kakao-wrap">
-        <div id="roadview"></div>
-        <div id="rv-close-btn" onclick="toggleMode('default')">로드뷰 닫기 X</div>
+    <!-- 2. 게시판 목록 화면 -->
+    <div id="view-board" class="view-section">
+        <div class="board-header">
+            <h3>📝 자유 게시판</h3>
+            <button class="btn btn-primary" onclick="showWrite()">글쓰기</button>
+        </div>
+        <div id="post-list">
+            <!-- 자바스크립트로 글 목록이 여기에 들어갑니다 -->
+            <div style="text-align:center; padding: 2rem; color:#888;">로딩 중...</div>
+        </div>
+    </div>
 
-        <div id="map">
-            <div id="resizer"></div>
-            
-            <div class="search_box">
-                <input type="text" id="keyword" placeholder="주소, 건물명 검색" onkeypress="if(event.keyCode==13) searchPlaces();">
-                <button onclick="searchPlaces()">검색</button>
+    <!-- 3. 글쓰기 화면 -->
+    <div id="view-write" class="view-section">
+        <div class="write-box">
+            <h3 style="margin-top:0;">새 글 작성</h3>
+            <div class="input-group">
+                <label>제목</label>
+                <input type="text" id="title-input" placeholder="제목을 입력하세요">
             </div>
-
-            <div class="toolbar">
-                <button onclick="toggleMode('default')" class="active" id="btn-default">이동</button>
-                <button onclick="toggleMode('roadview')" id="btn-roadview">로드뷰</button>
-                <button onclick="toggleMode('distance')" id="btn-distance">거리</button>
-                <button onclick="toggleMode('area')" id="btn-area">면적</button>
-                <button onclick="clearMeasurements()" class="delete-btn">초기화</button>
+            <div class="input-group">
+                <label>내용</label>
+                <textarea id="content-input" placeholder="내용을 자유롭게 작성하세요"></textarea>
+            </div>
+            <div style="text-align: right;">
+                <button class="btn btn-outline" onclick="showBoard()">취소</button>
+                <button class="btn btn-primary" onclick="savePost()">등록하기</button>
             </div>
         </div>
     </div>
 </div>
 
-<div id="error-message" class="error-msg">
-    <h3>지도를 불러올 수 없습니다.</h3>
-    <p>API 키 설정을 확인해주세요.</p>
-</div>
+<!-- Firebase SDK -->
+<script type="module">
+    // 1. Firebase 라이브러리 불러오기
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-<!-- 1. 카카오맵 SDK (먼저 로드) -->
-<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=KAKAO_KEY_PLACEHOLDER&libraries=services,drawing,clusterer"></script>
-
-<!-- 2. 메인 스크립트 로직 (initGoogleMap 정의 포함) -->
-<script>
-    var mapContainer = document.getElementById('map');
-    var rvContainer = document.getElementById('roadview');
-    var rvCloseBtn = document.getElementById('rv-close-btn');
-    var resizer = document.getElementById('resizer');
-    
-    var googleMapWrap = document.getElementById('google-map-wrap');
-    var kakaoWrap = document.getElementById('kakao-wrap');
-
-    var map = null; 
-    var gMap = null; 
-    var syncLock = false; 
-
-    var ps = new kakao.maps.services.Places();
-    var rv = new kakao.maps.Roadview(rvContainer);
-    var rvClient = new kakao.maps.RoadviewClient();
-    
-    var mapWalker = null;
-    var searchMarker = null;
-    var currentMode = 'default';
-    var drawingObject = null;
-    var drawingPath = [];
-    var allOverlays = []; 
-    var allShapes = [];   
-    var allMarkers = [];  
-
-    var startLat = 37.566826;
-    var startLng = 126.9786567;
-
-    // 카카오맵 초기화
-    if (typeof kakao === 'undefined') {
-        document.getElementById('error-message').style.display = 'block';
-    } else {
-        var mapOption = { center: new kakao.maps.LatLng(startLat, startLng), level: 3 };
-        map = new kakao.maps.Map(mapContainer, mapOption);
-        map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
-        map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
-        
-        kakao.maps.event.addListener(map, 'center_changed', syncGoogleFromKakao);
-        kakao.maps.event.addListener(map, 'zoom_changed', syncGoogleFromKakao);
-    }
-
-    // [중요] initGoogleMap 함수를 전역(window)에 정의
-    window.initGoogleMap = function() {
-        var gOptions = { 
-            center: { lat: startLat, lng: startLng }, 
-            zoom: 17, 
-            disableDefaultUI: false, 
-            scaleControl: true 
-        };
-        gMap = new google.maps.Map(document.getElementById('google-map'), gOptions);
-        
-        // 구글맵 이벤트 리스너
-        gMap.addListener('center_changed', syncKakaoFromGoogle);
-        gMap.addListener('zoom_changed', syncKakaoFromGoogle);
-        gMap.addListener('drag', syncKakaoFromGoogle);
+    // 2. Firebase 설정 (본인의 키로 교체해야 함)
+    const firebaseConfig = {
+        apiKey: "여기에_API_KEY_입력",
+        authDomain: "여기에_AUTH_DOMAIN_입력",
+        projectId: "여기에_PROJECT_ID_입력",
+        storageBucket: "여기에_STORAGE_BUCKET_입력",
+        messagingSenderId: "여기에_SENDER_ID_입력",
+        appId: "여기에_APP_ID_입력"
     };
 
-    // 동기화 함수들
-    function syncGoogleFromKakao() {
-        if (!gMap || syncLock) return;
-        syncLock = true;
-        var center = map.getCenter();
-        var kLevel = map.getLevel();
-        var gZoom = 20 - kLevel;
-        gMap.setCenter({ lat: center.getLat(), lng: center.getLng() });
-        if(gMap.getZoom() !== gZoom) gMap.setZoom(gZoom);
-        setTimeout(function(){ syncLock = false; }, 50);
-    }
+    // 3. 앱 초기화
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
 
-    function syncKakaoFromGoogle() {
-        if (!map || syncLock) return;
-        syncLock = true;
-        var center = gMap.getCenter();
-        var gZoom = gMap.getZoom();
-        var kLevel = 20 - gZoom;
-        if (kLevel < 1) kLevel = 1; if (kLevel > 14) kLevel = 14;
-        map.setCenter(new kakao.maps.LatLng(center.lat(), center.lng()));
-        if(map.getLevel() !== kLevel) map.setLevel(kLevel);
-        setTimeout(function(){ syncLock = false; }, 50);
-    }
+    let currentUser = null; // 현재 로그인한 사용자 정보
 
-    function createWalkerContent(angle) {
-        return `<div class="MapWalker">
-                    <div class="angleBack" style="transform: rotate(${angle}deg);"></div>
-                    <div class="figure" style="transform: rotate(${angle}deg);"></div>
-                </div>`;
-    }
+    // [인증] 로그인 함수 (전역 window 객체에 연결)
+    window.googleLogin = () => {
+        signInWithPopup(auth, provider)
+            .then((result) => {
+                console.log("로그인 성공:", result.user);
+            }).catch((error) => {
+                console.error("로그인 실패:", error);
+                alert("로그인 중 오류가 발생했습니다.");
+            });
+    };
 
-    function searchPlaces() {
-        var keyword = document.getElementById('keyword').value.trim();
-        if (!keyword) { alert('키워드를 입력해주세요!'); return; }
-        ps.keywordSearch(keyword, placesSearchCB);
-    }
+    // [인증] 로그아웃 함수
+    window.logout = () => {
+        signOut(auth).then(() => {
+            alert("로그아웃 되었습니다.");
+            location.reload();
+        });
+    };
 
-    function placesSearchCB(data, status, pagination) {
-        if (status === kakao.maps.services.Status.OK) {
-            var targetPosition = new kakao.maps.LatLng(data[0].y, data[0].x);
-            if (searchMarker) searchMarker.setMap(null);
-            searchMarker = new kakao.maps.Marker({ position: targetPosition, map: map });
-            map.setCenter(targetPosition);
-            map.setLevel(3);
-            if (currentMode === 'roadview') toggleRoadview(targetPosition);
-        } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
-            alert('검색 결과가 없습니다.');
+    // [인증] 상태 변경 감지 (로그인/로그아웃 시 자동 실행)
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // 로그인 상태
+            currentUser = user;
+            document.getElementById('btn-login').style.display = 'none';
+            document.getElementById('btn-logout').style.display = 'block';
+            document.getElementById('user-display').style.display = 'inline';
+            document.getElementById('user-display').textContent = `${user.displayName}님`;
+            
+            showBoard(); // 게시판 보여주기
+            loadPosts(); // 글 목록 불러오기
         } else {
-            alert('오류가 발생했습니다.');
+            // 로그아웃 상태
+            currentUser = null;
+            document.getElementById('btn-login').style.display = 'block';
+            document.getElementById('btn-logout').style.display = 'none';
+            document.getElementById('user-display').style.display = 'none';
+            
+            showLoginRequired(); // 로그인 유도 화면
         }
-    }
+    });
 
-    function toggleMode(mode) {
-        if (!map) return;
-        stopDrawing();
+    // [DB] 글 저장 함수
+    window.savePost = async () => {
+        const title = document.getElementById('title-input').value;
+        const content = document.getElementById('content-input').value;
 
-        if (mode === 'roadview' && currentMode === 'roadview') {
-            toggleMode('default'); 
+        if(!title || !content) {
+            alert("제목과 내용을 모두 입력해주세요.");
             return;
         }
 
-        document.querySelectorAll('.toolbar button').forEach(btn => {
-            if(!btn.classList.contains('delete-btn')) btn.classList.remove('active');
-        });
-        var targetBtn = document.getElementById('btn-' + mode);
-        if(targetBtn) targetBtn.classList.add('active');
+        try {
+            await addDoc(collection(db, "posts"), {
+                title: title,
+                content: content,
+                author: currentUser.displayName,
+                uid: currentUser.uid,
+                createdAt: serverTimestamp() // 서버 시간
+            });
+            alert("글이 등록되었습니다!");
+            document.getElementById('title-input').value = '';
+            document.getElementById('content-input').value = '';
+            showBoard();
+            loadPosts();
+        } catch (e) {
+            console.error("Error adding document: ", e);
+            alert("글 저장 실패: " + e.message);
+        }
+    };
 
-        if (currentMode === 'roadview' && mode !== 'roadview') {
-            closeRoadviewUI();
+    // [DB] 글 목록 불러오기 함수
+    async function loadPosts() {
+        const listDiv = document.getElementById('post-list');
+        listDiv.innerHTML = '<div style="text-align:center; padding:1rem;">글을 불러오는 중...</div>';
+
+        // 날짜 내림차순 정렬
+        const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+
+        listDiv.innerHTML = ""; // 초기화
+
+        if (querySnapshot.empty) {
+            listDiv.innerHTML = '<div style="text-align:center; padding:2rem;">작성된 글이 없습니다. 첫 글을 남겨보세요!</div>';
+            return;
         }
 
-        currentMode = mode;
-
-        if (mode === 'roadview') {
-            googleMapWrap.style.width = '0%';
-            kakaoWrap.style.width = '100%';
-
-            rvContainer.style.display = 'block';
-            rvCloseBtn.style.display = 'block';
-            resizer.style.display = 'block';
-
-            mapContainer.style.width = ''; 
-            mapContainer.style.height = ''; 
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            // 날짜 포맷팅
+            const date = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString() : '방금 전';
             
-            mapContainer.classList.add('minimap');
-            map.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-
-            setTimeout(function() { 
-                map.relayout(); 
-                rv.relayout(); 
-                toggleRoadview(map.getCenter());
-            }, 300);
-
-        } else if (mode === 'distance' || mode === 'area') {
-            map.setCursor('crosshair');
-        } else {
-            map.setCursor('default');
-            if (googleMapWrap.style.width === '0%') {
-                closeRoadviewUI();
-            }
-        }
-    }
-
-    function closeRoadviewUI() {
-        rvContainer.style.display = 'none';
-        rvCloseBtn.style.display = 'none';
-        
-        googleMapWrap.style.width = '50%';
-        kakaoWrap.style.width = '50%';
-        
-        mapContainer.classList.remove('minimap');
-        resizer.style.display = 'none';
-
-        mapContainer.style.width = '100%';
-        mapContainer.style.height = '100%';
-
-        map.removeOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
-        
-        if(mapWalker) {
-            mapWalker.setMap(null);
-            mapWalker = null;
-        }
-        
-        setTimeout(function() { 
-            map.relayout(); 
-            if(gMap) google.maps.event.trigger(gMap, "resize");
-            syncGoogleFromKakao(); 
-        }, 300);
-    }
-
-    function toggleRoadview(position) {
-        rvClient.getNearestPanoId(position, 50, function(panoId) {
-            if (panoId) {
-                rv.setPanoId(panoId, position);
-                if(!mapWalker) initWalker(position);
-                else moveWalker(position);
-            }
+            const html = `
+                <div class="post-card">
+                    <div class="post-title">${escapeHtml(data.title)}</div>
+                    <div class="post-meta">
+                        <span><i class="fas fa-user"></i> ${escapeHtml(data.author)}</span>
+                        <span>${date}</span>
+                    </div>
+                    <div style="margin-top:10px; color:#555; font-size:0.9rem; line-height:1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        ${escapeHtml(data.content)}
+                    </div>
+                </div>
+            `;
+            listDiv.innerHTML += html;
         });
     }
 
-    var isResizing = false;
-    resizer.addEventListener('mousedown', function(e) { isResizing = true; e.preventDefault(); e.stopPropagation(); });
-    window.addEventListener('mousemove', function(e) {
-        if (!isResizing) return;
-        if (!mapContainer.classList.contains('minimap')) return;
-        var newWidth = e.clientX;
-        var newHeight = window.innerHeight - e.clientY;
-        if(newWidth < 200) newWidth = 200;
-        if(newHeight < 200) newHeight = 200;
-        mapContainer.style.width = newWidth + 'px';
-        mapContainer.style.height = newHeight + 'px';
-        map.relayout();
-        if(mapWalker) map.setCenter(mapWalker.getPosition());
-    });
-    window.addEventListener('mouseup', function() { if (isResizing) { isResizing = false; map.relayout(); } });
-
-    function initWalker(position) {
-        if(mapWalker) mapWalker.setMap(null);
-        mapWalker = new kakao.maps.CustomOverlay({ position: position, content: createWalkerContent(0), map: map });
+    // XSS 방지용 함수
+    function escapeHtml(text) {
+        if (!text) return text;
+        return text.replace(/&/g, "&amp;")
+                   .replace(/</g, "&lt;")
+                   .replace(/>/g, "&gt;")
+                   .replace(/"/g, "&quot;")
+                   .replace(/'/g, "&#039;");
     }
-    function moveWalker(position) { if(mapWalker) mapWalker.setPosition(position); }
-    kakao.maps.event.addListener(rv, 'viewpoint_changed', function() {
-        var viewpoint = rv.getViewpoint();
-        if(mapWalker) mapWalker.setContent(createWalkerContent(viewpoint.pan));
-    });
-    kakao.maps.event.addListener(rv, 'position_changed', function() {
-        var rvPos = rv.getPosition();
-        moveWalker(rvPos);
-        map.setCenter(rvPos);
-    });
-    kakao.maps.event.addListener(map, 'click', function(mouseEvent) {
-        var clickPosition = mouseEvent.latLng;
-        if (currentMode === 'roadview') { toggleRoadview(clickPosition); return; }
-        if (currentMode !== 'distance' && currentMode !== 'area') return;
-        drawingPath.push(clickPosition);
-        var marker = new kakao.maps.Marker({ position: clickPosition, map: map });
-        allMarkers.push(marker);
-        if (!drawingObject) {
-            if (currentMode === 'distance') {
-                drawingObject = new kakao.maps.Polyline({ map: map, path: [clickPosition], strokeWeight: 3, strokeColor: '#db4040', strokeOpacity: 1, strokeStyle: 'solid' });
-            } else {
-                drawingObject = new kakao.maps.Polygon({ map: map, path: [clickPosition], strokeWeight: 3, strokeColor: '#39f', strokeOpacity: 0.8, strokeStyle: 'longdash', fillColor: '#39f', fillOpacity: 0.2 });
-            }
-        } else {
-            drawingObject.setPath(drawingPath);
-            var content = '';
-            if (currentMode === 'distance') {
-                var dist = Math.round(drawingObject.getLength());
-                content = `<div class="measure-label">${dist.toLocaleString()}m</div>`;
-            } else if (currentMode === 'area') {
-                if (drawingPath.length >= 3) {
-                    var area = Math.round(drawingObject.getArea());
-                    content = `<div class="measure-label">${area.toLocaleString()}m²</div>`;
-                }
-            }
-            if (content) {
-                var labelOverlay = new kakao.maps.CustomOverlay({ map: map, position: clickPosition, content: content, yAnchor: 2.5 });
-                allOverlays.push(labelOverlay);
-            }
-        }
-    });
-    kakao.maps.event.addListener(map, 'mousemove', function(mouseEvent) {
-        if (!drawingObject) return;
-        var path = drawingPath.slice();
-        path.push(mouseEvent.latLng);
-        drawingObject.setPath(path);
-    });
-    kakao.maps.event.addListener(map, 'rightclick', function(mouseEvent) {
-        if (!drawingObject) return;
-        var position = drawingPath[drawingPath.length - 1];
-        var content = '';
-        if (currentMode === 'distance') {
-            var dist = Math.round(drawingObject.getLength());
-            content = `<div class="info-overlay">총 거리 <span class="number">${dist.toLocaleString()}m</span></div>`;
-        } else {
-            var area = Math.round(drawingObject.getArea());
-            var pyeong = (area * 0.3025).toFixed(1);
-            content = `<div class="info-overlay">총 면적 <span class="number">${area.toLocaleString()}m²</span><br><span class="desc">(${Number(pyeong).toLocaleString()}평)</span></div>`;
-        }
-        var overlay = new kakao.maps.CustomOverlay({ map: map, position: position, content: content, yAnchor: 1 });
-        allOverlays.push(overlay);
-        allShapes.push(drawingObject);
-        drawingObject = null;
-        drawingPath = [];
-    });
 
-    function clearMeasurements() {
-        allOverlays.forEach(o => o.setMap(null));
-        allShapes.forEach(s => s.setMap(null));
-        allMarkers.forEach(m => m.setMap(null));
-        allOverlays = []; allShapes = []; allMarkers = [];
-        stopDrawing();
-        if (searchMarker) { searchMarker.setMap(null); searchMarker = null; }
-        document.getElementById('keyword').value = '';
+    // [UI] 화면 전환 함수들
+    window.showLoginRequired = () => {
+        hideAll();
+        document.getElementById('view-login-required').classList.add('active');
+    };
+    window.showBoard = () => {
+        if(!currentUser) { alert('로그인이 필요합니다.'); return; }
+        hideAll();
+        document.getElementById('view-board').classList.add('active');
+        loadPosts();
+    };
+    window.showWrite = () => {
+        if(!currentUser) { alert('로그인이 필요합니다.'); return; }
+        hideAll();
+        document.getElementById('view-write').classList.add('active');
+    };
+    function hideAll() {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     }
-    function stopDrawing() { if (drawingObject) drawingObject.setMap(null); drawingObject = null; drawingPath = []; }
 </script>
 
-<!-- 3. 구글맵 API (제일 마지막에 로드하여 initGoogleMap 정의 후 실행되도록 함) -->
-<!-- YOUR_GOOGLE_API_KEY 부분에 본인의 키를 입력하세요 -->
-<script src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_KEY_PLACEHOLDER&callback=initGoogleMap" async defer></script>
 </body>
 </html>
-
